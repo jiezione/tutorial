@@ -3,12 +3,22 @@ name: Deploy GitHub Pages with Repo Info
 on:
   push:
     branches: [ main ]  # 替换为你的主分支名称
+  # 允许手动手动触发部署
+  workflow_dispatch:
+
+# 授予工作流必要的权限
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 确保获取所有历史记录，避免部署不完整
       
       - name: Inject repo info into index.html
         run: |
@@ -22,7 +32,13 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
+          # 使用个人访问令牌代替默认的github_token
+          # 如果你使用这个选项，需要在仓库设置中添加名为GH_PAGES_TOKEN的secret
+          # personal_token: ${{ secrets.GH_PAGES_TOKEN }}
+          
+          # 对于公共仓库，使用以下配置通常足够
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
           keep_files: false
-    
+          # 指定部署分支
+          publish_branch: gh-pages
