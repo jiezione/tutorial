@@ -1,32 +1,69 @@
 // 动态创建小动物元素并添加到页面
 (function() {
-    // 尝试自动获取GitHub信息
-    function getGitHubInfo() {
-        // 1. 优先从meta标签获取（推荐用于自定义域名）
-        const githubMeta = document.querySelector('meta[name="github-repo"]');
-        if (githubMeta && githubMeta.content) {
-            return `https://github.com/${githubMeta.content}`;
+    // 智能识别GitHub仓库链接
+    function smartDetectGitHubUrl() {
+        // GitHub URL 匹配规则
+        const githubRegex = /https?:\/\/(www\.)?github\.com\/([^\/]+)\/([^\/]+)/i;
+        
+        // 1. 扫描页面中所有链接寻找GitHub仓库地址
+        const links = document.getElementsByTagName('a');
+        const githubLinks = [];
+        
+        for (let link of links) {
+            const href = link.href;
+            if (githubRegex.test(href)) {
+                // 提取用户名和仓库名
+                const match = href.match(githubRegex);
+                if (match && match[2] && match[3]) { // 确保有用户名和仓库名
+                    githubLinks.push({
+                        url: href,
+                        score: 10, // 基础分数
+                        text: link.textContent.toLowerCase()
+                    });
+                }
+            }
         }
         
-        // 2. 从GitHub解析（适用于github.io域名）
-        const hostname = window.location.hostname;
-        if (hostname.endsWith('.github.io')) {
-            const username = hostname.split('.')[0];
-            // 提取仓库名（如果URL中有路径）
-            const pathParts = window.location.pathname.split('/').filter(part => part);
-            const repoName = pathParts.length > 0 ? pathParts[0] : '';
+        // 2. 为链接评分，找到最可能的仓库链接
+        if (githubLinks.length > 0) {
+            githubLinks.forEach(link => {
+                // 包含"repo"、"repository"、"code"等关键词的链接加分
+                const keywords = ['repo', 'repository', 'code', 'source', '项目', '仓库'];
+                keywords.forEach(keyword => {
+                    if (link.text.includes(keyword)) {
+                        link.score += 5;
+                    }
+                });
+                
+                // 页面底部的链接更可能是仓库链接
+                const linkRect = link.getBoundingClientRect();
+                if (linkRect.bottom > window.innerHeight * 0.7) {
+                    link.score += 3;
+                }
+            });
             
-            return repoName ? `https://github.com/${username}/${repoName}` : `https://github.com/${username}`;
+            // 按分数排序，取最高分的链接
+            githubLinks.sort((a, b) => b.score - a.score);
+            return githubLinks[0].url;
         }
         
-        // 3. 如果都无法识别，返回null
-        return null;
+        // 3. 如果没有找到仓库链接，尝试从自定义域名推断
+        // （适用于常用的自定义域名命名规范）
+        const hostname = window.location.hostname;
+        const domainParts = hostname.split('.');
+        if (domainParts.length >= 2) {
+            // 尝试从子域名或主域名提取可能的用户名
+            const possibleUser = domainParts[0];
+            return `https://github.com/${possibleUser}`;
+        }
+        
+        // 4. 最终 fallback
+        return "https://github.com";
     }
 
     // 配置参数
     const config = {
-        githubUrl: getGitHubInfo(), // 自动获取GitHub链接
-        fallbackUrl: "https://github.com", // 无法识别时的备用链接
+        githubUrl: smartDetectGitHubUrl(), // 智能识别GitHub链接
         animalImage: "https://cdn-icons-png.flaticon.com/128/237/237921.png", // 小动物图片
         size: 60, // 小动物尺寸（像素）
         moveSpeed: 2, // 移动速度
@@ -86,7 +123,7 @@
     `;
     document.body.appendChild(animal);
 
-    // 状态变量
+    // 状态变量和移动逻辑（保持不变）
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
@@ -96,7 +133,6 @@
     let velocityY = config.moveSpeed;
     let isClick = true;
 
-    // 初始化位置（随机在可视区域内）
     function initPosition() {
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
@@ -105,17 +141,14 @@
         updatePosition();
     }
 
-    // 更新位置
     function updatePosition() {
         animal.style.left = `${currentX}px`;
         animal.style.top = `${currentY}px`;
     }
 
-    // 自动移动逻辑
     function autoMove() {
         if (isDragging) return;
 
-        // 边界检测与反弹
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
 
@@ -126,7 +159,6 @@
             velocityY = -velocityY;
         }
 
-        // 更新位置
         currentX += velocityX;
         currentY += velocityY;
         updatePosition();
@@ -134,14 +166,12 @@
         requestAnimationFrame(autoMove);
     }
 
-    // 随机改变移动方向
     function randomChangeDirection() {
         if (isDragging) {
             setTimeout(randomChangeDirection, 500);
             return;
         }
         
-        // 随机角度改变方向
         const angle = Math.random() * Math.PI * 2;
         velocityX = Math.cos(angle) * config.moveSpeed;
         velocityY = Math.sin(angle) * config.moveSpeed;
@@ -162,11 +192,9 @@
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
 
-        // 计算新位置（考虑页面滚动）
         currentX = e.clientX - offsetX + window.scrollX;
         currentY = e.clientY - offsetY + window.scrollY;
 
-        // 限制在边界内
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
         currentX = Math.max(config.boundaryPadding, Math.min(currentX, maxX));
@@ -186,12 +214,10 @@
     // 点击跳转GitHub
     animal.addEventListener('click', () => {
         if (isClick) {
-            const targetUrl = config.githubUrl || config.fallbackUrl;
-            window.open(targetUrl, '_blank');
+            window.open(config.githubUrl, '_blank');
         }
     });
 
-    // 窗口大小改变时调整位置
     window.addEventListener('resize', () => {
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
