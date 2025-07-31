@@ -2,7 +2,7 @@ name: Deploy GitHub Pages with Repo Info
 
 on:
   push:
-    branches: [ main ]  # 替换为你的主分支名称，通常是main或master
+    branches: [ main ]  # 替换为你的主分支名称
 
 jobs:
   deploy:
@@ -12,11 +12,11 @@ jobs:
       
       - name: Inject repo info into index.html
         run: |
-          # 在head标签中插入包含仓库信息的meta标签
-          sed -i 's/<head>/<head>\n    <meta name="github-repo" content="${{ github.repository }}">/' index.html
+          # 修复sed命令：使用双引号允许变量扩展，使用环境变量GITHUB_REPOSITORY
+          sed -i "s/<head>/<head>\n    <meta name=\"github-repo\" content=\"$GITHUB_REPOSITORY\">/" index.html
           
-          # 显示修改后的结果（验证用）
-          echo "已注入仓库信息：${{ github.repository }}"
+          # 显示修改后的结果进行验证
+          echo "已注入的仓库信息：$GITHUB_REPOSITORY"
           cat index.html | grep 'github-repo'
       
       - name: Deploy to GitHub Pages
@@ -24,4 +24,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
-          keep_files: false  # 确保每次部署都是干净的
+          keep_files: false
+    
