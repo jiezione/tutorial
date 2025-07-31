@@ -12,10 +12,10 @@ jobs:
       
       - name: Inject repo info into index.html
         run: |
-          # 修复sed命令：使用双引号允许变量扩展，使用环境变量GITHUB_REPOSITORY
-          sed -i "s/<head>/<head>\n    <meta name=\"github-repo\" content=\"$GITHUB_REPOSITORY\">/" index.html
+          # 使用 | 作为分隔符，避免与仓库名中的 / 冲突
+          sed -i "s|<head>|<head>\n    <meta name=\"github-repo\" content=\"$GITHUB_REPOSITORY\">|" index.html
           
-          # 显示修改后的结果进行验证
+          # 验证注入结果
           echo "已注入的仓库信息：$GITHUB_REPOSITORY"
           cat index.html | grep 'github-repo'
       
