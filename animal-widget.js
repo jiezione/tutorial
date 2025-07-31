@@ -1,8 +1,7 @@
-// 2D游戏风格卡通角色组件
+// 2D游戏角色精灵动画组件
 (function() {
-    // 仓库信息识别逻辑（保持原有可靠的识别方式）
+    // 仓库信息识别（保持原有逻辑）
     function detectRepoInfo() {
-        // 1. 优先读取meta标签
         const repoMeta = document.querySelector('meta[name="github-repo"]');
         if (repoMeta && repoMeta.content) {
             const [username, repoName] = repoMeta.content.split('/');
@@ -10,8 +9,6 @@
                 username, repoName, repoUrl: `https://github.com/${username}/${repoName}`
             } : null;
         }
-        
-        // 2. 从链接提取
         const repoRegex = /github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)/i;
         const links = document.getElementsByTagName('a');
         for (let link of links) {
@@ -24,13 +21,20 @@
     }
     const repoInfo = detectRepoInfo();
 
-    // 配置参数
+    // 配置（核心：精灵动画参数）
     const config = {
-        width: 120,      // 角色宽度
-        height: 140,     // 角色高度
-        moveSpeed: 2,    // 移动速度
-        jumpHeight: 5,   // 跳跃高度
-        emotionRate: 5000 // 表情变化间隔(ms)
+        // 精灵图配置（根据实际帧图调整）
+        sprite: {
+            width: 128,    // 单帧宽度
+            height: 192,   // 单帧高度
+            totalFrames: 4, // 总帧数
+            frameRate: 100, // 每帧间隔(ms)
+            // 角色动画帧图（替换为你的序列帧图片）
+            imageUrl: "https://picsum.photos/id/237/512/192" // 示例：4帧横向排列的精灵图
+        },
+        speed: 2,       // 移动速度
+        startX: window.innerWidth - 150, // 初始X（右下角）
+        startY: window.innerHeight - 220 // 初始Y（右下角）
     };
 
     // 创建样式
@@ -41,17 +45,15 @@
             z-index: 9999;
             cursor: move;
             user-select: none;
-            transition: transform 0.2s ease;
+            width: ${config.sprite.width}px;
+            height: ${config.sprite.height}px;
         }
-        #game-character:active {
-            cursor: grabbing;
-        }
-        #game-character:hover {
-            transform: scale(1.05);
-        }
-        #game-character canvas {
-            width: ${config.width}px;
-            height: ${config.height}px;
+        #game-character .sprite {
+            width: 100%;
+            height: 100%;
+            background-size: ${config.sprite.totalFrames * 100}% 100%;
+            background-image: url("${config.sprite.imageUrl}");
+            transition: background-position 0.1s steps(1);
         }
         #game-character .tooltip {
             position: absolute;
@@ -61,26 +63,15 @@
             background: #24292e;
             color: white;
             padding: 5px 10px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 12px;
             white-space: nowrap;
             opacity: 0;
+            transition: opacity 0.2s;
             pointer-events: none;
-            transition: all 0.2s ease;
         }
         #game-character:hover .tooltip {
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        #game-character .tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #24292e transparent transparent transparent;
         }
     `;
     document.head.appendChild(style);
@@ -88,183 +79,55 @@
     // 创建角色容器
     const container = document.createElement('div');
     container.id = 'game-character';
+    container.style.left = `${config.startX}px`;
+    container.style.top = `${config.startY}px`;
     const tooltipText = repoInfo ? `GitHub: ${repoInfo.username}/${repoInfo.repoName}` : 'GitHub 仓库';
-    container.innerHTML = `<div class="tooltip">${tooltipText}</div>`;
+    container.innerHTML = `
+        <div class="tooltip">${tooltipText}</div>
+        <div class="sprite"></div>
+    `;
     document.body.appendChild(container);
+    const sprite = container.querySelector('.sprite');
 
-    // 创建Canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = config.width;
-    canvas.height = config.height;
-    container.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-
-    // 角色状态
+    // 动画状态
     const state = {
-        x: window.innerWidth - config.width - 20,
-        y: window.innerHeight - config.height - 20,
-        vx: config.moveSpeed * (Math.random() > 0.5 ? 1 : -1),
-        vy: 0,
-        isJumping: false,
-        jumpCount: 0,
-        emotion: 'idle', // idle, happy, confused, excited
-        frame: 0,
+        currentFrame: 0,
+        direction: 1, // 1:右, -1:左
         isDragging: false,
         offsetX: 0,
         offsetY: 0,
-        // 动画物理参数
-        gravity: 0.2,
-        jumpForce: -5,
-        maxJumps: 2
+        velocityX: config.speed
     };
 
-    // 绘制角色函数
-    function drawCharacter() {
-        // 清除画布
-        ctx.clearRect(0, 0, config.width, config.height);
-        
-        // 更新动画帧
-        state.frame = (state.frame + 0.1) % 10;
-        
-        // 保存状态
-        ctx.save();
-        
-        // 绘制身体
-        // 躯干
-        ctx.fillStyle = '#3B82F6'; // 蓝色上衣
-        ctx.fillRect(40, 60, 40, 50);
-        
-        // 头部
-        ctx.beginPath();
-        ctx.arc(60, 40, 25, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFDBAC'; // 肤色
-        ctx.fill();
-        ctx.strokeStyle = '#E0B080';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // 眼睛（根据表情变化）
-        ctx.fillStyle = '#333';
-        switch(state.emotion) {
-            case 'idle':
-                ctx.beginPath();
-                ctx.ellipse(50, 35, 3, 4, 0, 0, Math.PI * 2);
-                ctx.ellipse(70, 35, 3, 4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // 嘴巴
-                ctx.beginPath();
-                ctx.arc(60, 48, 5, 0, Math.PI, false);
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-                break;
-                
-            case 'happy':
-                ctx.beginPath();
-                ctx.ellipse(50, 33, 4, 4, 0, 0, Math.PI * 2);
-                ctx.ellipse(70, 33, 4, 4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // 微笑嘴巴
-                ctx.beginPath();
-                ctx.arc(60, 50, 8, 0, Math.PI, false);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                break;
-                
-            case 'confused':
-                ctx.beginPath();
-                ctx.ellipse(50, 37, 3, 4, 0.3, 0, Math.PI * 2);
-                ctx.ellipse(70, 37, 3, 4, -0.3, 0, Math.PI * 2);
-                ctx.fill();
-                // 困惑嘴巴
-                ctx.beginPath();
-                ctx.arc(60, 50, 3, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-                
-            case 'excited':
-                ctx.beginPath();
-                ctx.ellipse(50, 32, 4, 5, 0, 0, Math.PI * 2);
-                ctx.ellipse(70, 32, 4, 5, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // 兴奋嘴巴
-                ctx.beginPath();
-                ctx.arc(60, 52, 10, 0, Math.PI, false);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                break;
-        }
-        
-        // 手臂（带动画）
-        const armSwing = Math.sin(state.frame) * 10;
-        ctx.fillStyle = '#FFDBAC';
-        // 左臂
-        ctx.fillRect(25, 65 + armSwing, 15, 5);
-        // 右臂
-        ctx.fillRect(80, 65 - armSwing, 15, 5);
-        
-        // 腿部（带动画）
-        const legSwing = Math.cos(state.frame) * 5;
-        ctx.fillStyle = '#1E40AF'; // 深色裤子
-        // 左腿
-        ctx.fillRect(45, 110, 10, 20 + legSwing);
-        // 右腿
-        ctx.fillRect(65, 110, 10, 20 - legSwing);
-        
-        // 头发
-        ctx.fillStyle = '#1F2937';
-        ctx.beginPath();
-        ctx.arc(60, 30, 28, 0, Math.PI, true);
-        ctx.fill();
-        // 头发细节
-        ctx.fillRect(35, 15, 5, 15);
-        ctx.fillRect(80, 15, 5, 15);
-        ctx.fillRect(60, 5, 5, 10);
-        
-        // 恢复状态
-        ctx.restore();
-        
-        requestAnimationFrame(drawCharacter);
+    // 精灵动画逻辑
+    function animateSprite() {
+        // 更新帧（循环切换）
+        state.currentFrame = (state.currentFrame + 1) % config.sprite.totalFrames;
+        // 计算背景位置（横向序列帧）
+        const xPos = -state.currentFrame * (100 / (config.sprite.totalFrames - 1));
+        sprite.style.backgroundPosition = `${xPos}% 0`;
+        setTimeout(animateSprite, config.sprite.frameRate);
     }
 
-    // 物理和移动更新
-    function update() {
-        if (!state.isDragging) {
-            // 应用重力
-            state.vy += state.gravity;
-            state.y += state.vy;
-            
-            // 边界检测
-            const maxX = window.innerWidth - config.width;
-            const maxY = window.innerHeight - config.height;
-            
-            if (state.x <= 0 || state.x >= maxX) {
-                state.vx = -state.vx;
-                // 碰到左右边界时跳跃
-                if (state.y >= maxY - 10) {
-                    state.vy = state.jumpForce;
-                }
-            }
-            
-            if (state.y >= maxY) {
-                state.y = maxY;
-                state.vy = 0;
-                state.isJumping = false;
-                state.jumpCount = 0;
-            }
-            
-            // 随机改变表情
-            if (Math.random() < 0.001) {
-                const emotions = ['idle', 'happy', 'confused', 'excited'];
-                state.emotion = emotions[Math.floor(Math.random() * emotions.length)];
-            }
-            
-            // 更新位置
-            state.x += state.vx;
-            container.style.left = `${state.x}px`;
-            container.style.top = `${state.y}px`;
-        }
+    // 自动移动逻辑
+    function moveCharacter() {
+        if (state.isDragging) return;
+
+        // 获取容器当前位置
+        let currentX = parseFloat(container.style.left);
+        const maxX = window.innerWidth - config.sprite.width;
         
-        requestAnimationFrame(update);
+        // 边界反弹
+        if (currentX <= 0 || currentX >= maxX) {
+            state.direction *= -1;
+            // 翻转角色（左右方向）
+            sprite.style.transform = state.direction > 0 ? 'scaleX(1)' : 'scaleX(-1)';
+        }
+
+        // 更新位置
+        currentX += state.velocityX * state.direction;
+        container.style.left = `${currentX}px`;
+        requestAnimationFrame(moveCharacter);
     }
 
     // 拖动功能
@@ -273,54 +136,32 @@
         const rect = container.getBoundingClientRect();
         state.offsetX = e.clientX - rect.left;
         state.offsetY = e.clientY - rect.top;
-        container.style.transition = 'none';
     });
 
     document.addEventListener('mousemove', (e) => {
         if (state.isDragging) {
-            state.x = e.clientX - state.offsetX + window.scrollX;
-            state.y = e.clientY - state.offsetY + window.scrollY;
-            
+            const x = e.clientX - state.offsetX + window.scrollX;
+            const y = e.clientY - state.offsetY + window.scrollY;
             // 限制在窗口内
-            const maxX = window.innerWidth - config.width;
-            const maxY = window.innerHeight - config.height;
-            state.x = Math.max(0, Math.min(state.x, maxX));
-            state.y = Math.max(0, Math.min(state.y, maxY));
-            
-            container.style.left = `${state.x}px`;
-            container.style.top = `${state.y}px`;
+            const maxX = window.innerWidth - config.sprite.width;
+            const maxY = window.innerHeight - config.sprite.height;
+            container.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
+            container.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
         }
     });
 
     document.addEventListener('mouseup', () => {
-        if (state.isDragging) {
-            state.isDragging = false;
-            container.style.transition = 'transform 0.2s ease';
-            // 拖动结束后给一个小跳跃
-            state.vy = state.jumpForce * 0.7;
-        }
+        state.isDragging = false;
     });
 
     // 点击跳转
     container.addEventListener('click', () => {
         if (repoInfo?.repoUrl) {
             window.open(repoInfo.repoUrl, '_blank');
-        } else {
-            window.open('https://github.com', '_blank');
         }
     });
 
-    // 窗口大小改变时调整位置
-    window.addEventListener('resize', () => {
-        const maxX = window.innerWidth - config.width;
-        const maxY = window.innerHeight - config.height;
-        state.x = Math.max(0, Math.min(state.x, maxX));
-        state.y = Math.max(0, Math.min(state.y, maxY));
-        container.style.left = `${state.x}px`;
-        container.style.top = `${state.y}px`;
-    });
-
-    // 启动动画
-    drawCharacter();
-    update();
+    // 初始化动画
+    animateSprite();
+    moveCharacter();
 })();
