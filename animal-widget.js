@@ -1,171 +1,111 @@
-// 完全自动识别GitHub仓库的动态组件
+// 卡通人组件 - 右下角固定+拖动+表情切换
 (function() {
-    // 配置参数
+    // 配置参数（新增表情图片数组）
     const config = {
-        animalImage: "https://cdn-icons-png.flaticon.com/128/237/237921.png",
-        size: 60,
-        moveSpeed: 2.5,
-        boundaryPadding: 15
+        // 多个表情图片，实现表情变化效果
+       表情图片: [
+            "https://cdn-icons-png.flaticon.com/128/1804/1804417.png", // 开心
+            "https://cdn-icons-png.flaticon.com/128/1804/1804425.png", // 眨眼
+            "https://cdn-icons-png.flaticon.com/128/1804/1804433.png", // 惊讶
+            "https://cdn-icons-png.flaticon.com/128/1804/1804445.png"  // 调皮
+        ],
+        size: 80, // 卡通人大小
+        moveSpeed: 2, // 自动移动速度（拖动时会暂停）
+        boundaryPadding: 15,
+        表情切换间隔: 3000 // 3秒切换一次表情
     };
 
-    // 从页面元数据获取仓库信息（由GitHub Actions自动注入）
-    function getRepoInfoFromMeta() {
+    // 仓库信息识别逻辑（保持不变）
+    function detectRepoInfo() {
         const repoMeta = document.querySelector('meta[name="github-repo"]');
         if (repoMeta && repoMeta.content) {
             const [username, repoName] = repoMeta.content.split('/');
-            if (username && repoName) {
-                return {
-                    username: username,
-                    repoName: repoName,
-                    repoUrl: `https://github.com/${username}/${repoName}`
-                };
-            }
+            return username && repoName ? {
+                username, repoName, repoUrl: `https://github.com/${username}/${repoName}`
+            } : null;
         }
-        return null;
-    }
-
-    // 从GitHub Pages环境变量获取（适用于GitHub Actions部署）
-    function getRepoInfoFromEnv() {
-        // 检查是否存在全局注入的GitHub环境变量
-        if (window.GITHUB_REPOSITORY) {
-            const [username, repoName] = window.GITHUB_REPOSITORY.split('/');
-            if (username && repoName) {
-                return {
-                    username: username,
-                    repoName: repoName,
-                    repoUrl: `https://github.com/${username}/${repoName}`
-                };
-            }
-        }
-        return null;
-    }
-
-    // 从页面链接智能提取（作为fallback）
-    function getRepoInfoFromLinks() {
         const repoRegex = /github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)/i;
         const links = document.getElementsByTagName('a');
-        
         for (let link of links) {
             const match = link.href.match(repoRegex);
-            if (match && match[1] && match[2]) {
-                // 优先选择带有"source"、"repo"、"repository"等关键词的链接
-                const linkText = link.textContent.toLowerCase();
-                if (linkText.includes('source') || linkText.includes('repo') || 
-                    linkText.includes('repository') || linkText.includes('代码')) {
-                    return {
-                        username: match[1],
-                        repoName: match[2],
-                        repoUrl: `https://github.com/${match[1]}/${match[2]}`
-                    };
-                }
-            }
+            if (match && match[1] && match[2]) return {
+                username: match[1], repoName: match[2], repoUrl: link.href
+            };
         }
-        
-        // 如果没有找到带关键词的链接，返回第一个匹配的仓库链接
-        for (let link of links) {
-            const match = link.href.match(repoRegex);
-            if (match && match[1] && match[2]) {
-                return {
-                    username: match[1],
-                    repoName: match[2],
-                    repoUrl: `https://github.com/${match[1]}/${match[2]}`
-                };
-            }
-        }
-        
         return null;
     }
-
-    // 主识别函数 - 多层级自动识别
-    function detectRepoInfo() {
-        // 1. 优先使用部署时注入的元数据（最可靠）
-        const metaInfo = getRepoInfoFromMeta();
-        if (metaInfo) return metaInfo;
-        
-        // 2. 其次使用环境变量
-        const envInfo = getRepoInfoFromEnv();
-        if (envInfo) return envInfo;
-        
-        // 3. 最后从页面链接提取
-        const linkInfo = getRepoInfoFromLinks();
-        if (linkInfo) return linkInfo;
-        
-        // 全部失败时返回null
-        return null;
-    }
-
-    // 执行识别
     const repoInfo = detectRepoInfo();
 
-    // 创建样式
+    // 创建样式（优化卡通人显示效果）
     const style = document.createElement('style');
     style.textContent = `
-        #auto-github-animal {
+        #cartoon-character {
             position: fixed;
             z-index: 9999;
             cursor: move;
             user-select: none;
             transition: transform 0.3s ease;
         }
-        #auto-github-animal:active {
+        #cartoon-character:active {
             cursor: grabbing;
         }
-        #auto-github-animal:hover {
-            transform: scale(1.15);
+        #cartoon-character:hover {
+            transform: scale(1.1) rotate(3deg); /* hover时轻微放大旋转 */
         }
-        #auto-github-animal img {
+        #cartoon-character img {
             width: ${config.size}px;
             height: ${config.size}px;
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));
+            border-radius: 50%; /* 圆形头像效果 */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.5s ease; /* 表情切换动画 */
         }
-        #auto-github-animal .tooltip {
+        #cartoon-character .tooltip {
             position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%) translateY(-5px);
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%) translateX(-10px);
             background: #24292e;
             color: white;
-            padding: 5px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
             font-size: 12px;
             white-space: nowrap;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
         }
-        #auto-github-animal:hover .tooltip {
+        #cartoon-character:hover .tooltip {
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        #auto-github-animal .tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #24292e transparent transparent transparent;
+            transform: translateY(-50%) translateX(0);
         }
     `;
     document.head.appendChild(style);
 
-    // 创建小动物元素
-    const animal = document.createElement('div');
-    animal.id = 'auto-github-animal';
-    
-    // 设置提示信息
-    const tooltipText = repoInfo 
-        ? `GitHub: ${repoInfo.username}/${repoInfo.repoName}`
-        : 'GitHub 仓库';
-    
-    animal.innerHTML = `
+    // 创建卡通人元素
+    const cartoon = document.createElement('div');
+    cartoon.id = 'cartoon-character';
+    const tooltipText = repoInfo ? `GitHub: ${repoInfo.username}/${repoInfo.repoName}` : 'GitHub 仓库';
+    cartoon.innerHTML = `
         <div class="tooltip">${tooltipText}</div>
-        <img src="${config.animalImage}" alt="GitHub仓库小动物">
+        <img src="${config.表情图片[0]}" alt="卡通人">
     `;
-    document.body.appendChild(animal);
+    document.body.appendChild(cartoon);
+    const imgElement = cartoon.querySelector('img');
 
-    // 移动和交互逻辑
+    // 表情切换逻辑
+    let currentEmotionIndex = 0;
+    function changeEmotion() {
+        currentEmotionIndex = (currentEmotionIndex + 1) % config.表情图片.length;
+        imgElement.style.opacity = 0; // 淡出效果
+        setTimeout(() => {
+            imgElement.src = config.表情图片[currentEmotionIndex];
+            imgElement.style.opacity = 1; // 淡入效果
+        }, 300);
+    }
+    // 定时切换表情
+    const emotionInterval = setInterval(changeEmotion, config.表情切换间隔);
+
+    // 位置控制（固定右下角初始化）
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
@@ -174,22 +114,22 @@
     let velocityX = config.moveSpeed;
     let velocityY = config.moveSpeed;
 
-    // 初始化位置
+    // 初始化到右下角
     function initPosition() {
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
-        currentX = Math.random() * (maxX - config.boundaryPadding) + config.boundaryPadding;
-        currentY = Math.random() * (maxY - config.boundaryPadding) + config.boundaryPadding;
+        // 固定在右下角
+        currentX = maxX;
+        currentY = maxY;
         updatePosition();
     }
 
-    // 更新位置
     function updatePosition() {
-        animal.style.left = `${currentX}px`;
-        animal.style.top = `${currentY}px`;
+        cartoon.style.left = `${currentX}px`;
+        cartoon.style.top = `${currentY}px`;
     }
 
-    // 自动移动逻辑
+    // 自动移动逻辑（保持活泼感）
     function autoMove() {
         if (isDragging) return;
 
@@ -197,37 +137,30 @@
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
 
         // 边界反弹
-        if (currentX <= config.boundaryPadding || currentX >= maxX) {
-            velocityX = -velocityX;
-        }
-        if (currentY <= config.boundaryPadding || currentY >= maxY) {
-            velocityY = -velocityY;
-        }
+        if (currentX <= config.boundaryPadding || currentX >= maxX) velocityX = -velocityX;
+        if (currentY <= config.boundaryPadding || currentY >= maxY) velocityY = -velocityY;
 
-        // 随机微调方向
-        velocityX += (Math.random() - 0.5) * 0.2;
-        velocityY += (Math.random() - 0.5) * 0.2;
+        // 随机微调方向（增加活泼感）
+        velocityX += (Math.random() - 0.5) * 0.3;
+        velocityY += (Math.random() - 0.5) * 0.3;
 
-        // 更新位置
         currentX += velocityX;
         currentY += velocityY;
         updatePosition();
-
         requestAnimationFrame(autoMove);
     }
 
     // 拖动功能
-    animal.addEventListener('mousedown', (e) => {
+    cartoon.addEventListener('mousedown', (e) => {
         isDragging = true;
-        const rect = animal.getBoundingClientRect();
+        const rect = cartoon.getBoundingClientRect();
         offsetX = e.clientX - rect.left;
         offsetY = e.clientY - rect.top;
-        animal.style.transition = 'none';
+        cartoon.style.transition = 'none'; // 拖动时取消动画
     });
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-
         currentX = e.clientX - offsetX + window.scrollX;
         currentY = e.clientY - offsetY + window.scrollY;
 
@@ -236,28 +169,22 @@
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
         currentX = Math.max(config.boundaryPadding, Math.min(currentX, maxX));
         currentY = Math.max(config.boundaryPadding, Math.min(currentY, maxY));
-
         updatePosition();
     });
 
     document.addEventListener('mouseup', () => {
         if (isDragging) {
             isDragging = false;
-            animal.style.transition = 'transform 0.3s ease';
+            cartoon.style.transition = 'transform 0.3s ease'; // 恢复动画
         }
     });
 
     // 点击跳转
-    animal.addEventListener('click', () => {
-        if (repoInfo && repoInfo.repoUrl) {
-            window.open(repoInfo.repoUrl, '_blank');
-        } else {
-            // 如果所有识别都失败，跳转到GitHub首页
-            window.open('https://github.com', '_blank');
-        }
+    cartoon.addEventListener('click', () => {
+        window.open(repoInfo?.repoUrl || 'https://github.com', '_blank');
     });
 
-    // 窗口大小改变时调整位置
+    // 窗口大小改变时重新限制位置
     window.addEventListener('resize', () => {
         const maxX = window.innerWidth - config.size - config.boundaryPadding;
         const maxY = window.innerHeight - config.size - config.boundaryPadding;
