@@ -1,8 +1,32 @@
 // 动态创建小动物元素并添加到页面
 (function() {
-    // 配置参数（可根据需要修改）
+    // 尝试自动获取GitHub信息
+    function getGitHubInfo() {
+        // 1. 优先从meta标签获取（推荐用于自定义域名）
+        const githubMeta = document.querySelector('meta[name="github-repo"]');
+        if (githubMeta && githubMeta.content) {
+            return `https://github.com/${githubMeta.content}`;
+        }
+        
+        // 2. 从GitHub解析（适用于github.io域名）
+        const hostname = window.location.hostname;
+        if (hostname.endsWith('.github.io')) {
+            const username = hostname.split('.')[0];
+            // 提取仓库名（如果URL中有路径）
+            const pathParts = window.location.pathname.split('/').filter(part => part);
+            const repoName = pathParts.length > 0 ? pathParts[0] : '';
+            
+            return repoName ? `https://github.com/${username}/${repoName}` : `https://github.com/${username}`;
+        }
+        
+        // 3. 如果都无法识别，返回null
+        return null;
+    }
+
+    // 配置参数
     const config = {
-        githubUrl: "https://github.com/你的用户名", // 替换为你的GitHub用户主页
+        githubUrl: getGitHubInfo(), // 自动获取GitHub链接
+        fallbackUrl: "https://github.com", // 无法识别时的备用链接
         animalImage: "https://cdn-icons-png.flaticon.com/128/237/237921.png", // 小动物图片
         size: 60, // 小动物尺寸（像素）
         moveSpeed: 2, // 移动速度
@@ -28,13 +52,38 @@
             height: ${config.size}px;
             filter: drop-shadow(0 3px 4px rgba(0,0,0,0.15));
         }
+        .animal-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        #dynamic-animal:hover .animal-tooltip {
+            opacity: 1;
+        }
     `;
     document.head.appendChild(style);
 
-    // 创建小动物元素
+    // 创建小动物元素（包含提示信息）
     const animal = document.createElement('div');
     animal.id = 'dynamic-animal';
-    animal.innerHTML = `<img src="${config.animalImage}" alt="动态小动物">`;
+    // 显示将要跳转的链接（隐藏域名，只显示用户/仓库部分）
+    const displayUrl = config.githubUrl 
+        ? config.githubUrl.replace('https://github.com/', '')
+        : 'GitHub';
+    animal.innerHTML = `
+        <div class="animal-tooltip">跳转到 ${displayUrl}</div>
+        <img src="${config.animalImage}" alt="动态小动物">
+    `;
     document.body.appendChild(animal);
 
     // 状态变量
@@ -137,7 +186,8 @@
     // 点击跳转GitHub
     animal.addEventListener('click', () => {
         if (isClick) {
-            window.open(config.githubUrl, '_blank');
+            const targetUrl = config.githubUrl || config.fallbackUrl;
+            window.open(targetUrl, '_blank');
         }
     });
 
