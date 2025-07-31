@@ -1,74 +1,128 @@
 // 动态创建小动物元素并添加到页面
 (function() {
-    // 智能识别GitHub仓库链接
-    function smartDetectGitHubUrl() {
-        // GitHub URL 匹配规则
-        const githubRegex = /https?:\/\/(www\.)?github\.com\/([^\/]+)\/([^\/]+)/i;
+    // 存储配置的键名
+    const STORAGE_KEY = 'githubAnimalWidgetConfig';
+    
+    // 从本地存储加载配置
+    function loadConfig() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    // 保存配置到本地存储
+    function saveConfig(config) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        } catch (e) {
+            console.log('无法保存配置到本地存储');
+        }
+    }
+    
+    // 提供全局方法让用户可以手动设置GitHub链接
+    window.setGitHubAnimalUrl = function(url) {
+        if (url && url.startsWith('https://github.com/')) {
+            saveConfig({ githubUrl: url });
+            // 更新显示和跳转链接
+            config.githubUrl = url;
+            updateTooltip();
+            console.log('GitHub链接已设置: ' + url);
+            return true;
+        }
+        console.error('请提供有效的GitHub链接，例如: https://github.com/用户名/仓库名');
+        return false;
+    };
+    
+    // 清除配置
+    window.clearGitHubAnimalUrl = function() {
+        localStorage.removeItem(STORAGE_KEY);
+        console.log('已清除保存的GitHub链接');
+    };
+
+    // 智能识别GitHub仓库链接 - 多重机制保障
+    function detectGitHubUrl() {
+        // 1. 优先使用用户之前设置并保存的链接
+        const savedConfig = loadConfig();
+        if (savedConfig && savedConfig.githubUrl) {
+            return savedConfig.githubUrl;
+        }
         
-        // 1. 扫描页面中所有链接寻找GitHub仓库地址
+        // 2. 扫描页面中所有GitHub链接
+        const githubRegex = /https?:\/\/(www\.)?github\.com\/([^\/]+)\/([^\/]+)/i;
         const links = document.getElementsByTagName('a');
         const githubLinks = [];
         
         for (let link of links) {
             const href = link.href;
             if (githubRegex.test(href)) {
-                // 提取用户名和仓库名
                 const match = href.match(githubRegex);
-                if (match && match[2] && match[3]) { // 确保有用户名和仓库名
+                if (match && match[2] && match[3]) {
                     githubLinks.push({
                         url: href,
-                        score: 10, // 基础分数
+                        score: 10,
                         text: link.textContent.toLowerCase()
                     });
                 }
             }
         }
         
-        // 2. 为链接评分，找到最可能的仓库链接
+        // 对链接评分
         if (githubLinks.length > 0) {
             githubLinks.forEach(link => {
-                // 包含"repo"、"repository"、"code"等关键词的链接加分
-                const keywords = ['repo', 'repository', 'code', 'source', '项目', '仓库'];
+                // 包含特定关键词加分
+                const keywords = ['repo', 'repository', 'code', 'source', '项目', '仓库', 'github'];
                 keywords.forEach(keyword => {
                     if (link.text.includes(keyword)) {
                         link.score += 5;
                     }
                 });
                 
-                // 页面底部的链接更可能是仓库链接
+                // 链接文本就是用户名/仓库名结构的加分
+                if (link.text.includes('/') && link.text.split('/').length >= 2) {
+                    link.score += 3;
+                }
+                
+                // 页脚链接加分
                 const linkRect = link.getBoundingClientRect();
                 if (linkRect.bottom > window.innerHeight * 0.7) {
                     link.score += 3;
                 }
             });
             
-            // 按分数排序，取最高分的链接
             githubLinks.sort((a, b) => b.score - a.score);
             return githubLinks[0].url;
         }
         
-        // 3. 如果没有找到仓库链接，尝试从自定义域名推断
-        // （适用于常用的自定义域名命名规范）
-        const hostname = window.location.hostname;
-        const domainParts = hostname.split('.');
-        if (domainParts.length >= 2) {
-            // 尝试从子域名或主域名提取可能的用户名
-            const possibleUser = domainParts[0];
-            return `https://github.com/${possibleUser}`;
+        // 3. 检查页面中是否有GitHub图标元素
+        const githubIcons = document.querySelectorAll('[class*="github"], [id*="github"]');
+        for (let icon of githubIcons) {
+            const parentLink = icon.closest('a');
+            if (parentLink && githubRegex.test(parentLink.href)) {
+                return parentLink.href;
+            }
         }
         
-        // 4. 最终 fallback
-        return "https://github.com";
+        // 4. 尝试从GitHub Pages的环境变量推断（适用于action部署）
+        // 注意：这只在部分部署环境中可用
+        if (window.GITHUB_REPOSITORY) {
+            return `https://github.com/${window.GITHUB_REPOSITORY}`;
+        }
+        
+        // 5. 最终fallback
+        return null;
     }
 
     // 配置参数
-    const config = {
-        githubUrl: smartDetectGitHubUrl(), // 智能识别GitHub链接
-        animalImage: "https://cdn-icons-png.flaticon.com/128/237/237921.png", // 小动物图片
-        size: 60, // 小动物尺寸（像素）
-        moveSpeed: 2, // 移动速度
-        changeDirInterval: 3000, // 改变方向间隔（毫秒）
-        boundaryPadding: 20 // 边界内边距
+    let config = {
+        githubUrl: detectGitHubUrl(),
+        animalImage: "https://cdn-icons-png.flaticon.com/128/237/237921.png",
+        size: 60,
+        moveSpeed: 2,
+        changeDirInterval: 3000,
+        boundaryPadding: 20
     };
 
     // 创建样式
@@ -103,27 +157,45 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         #dynamic-animal:hover .animal-tooltip {
             opacity: 1;
         }
+        .animal-tooltip.error {
+            background: #e53e3e;
+        }
     `;
     document.head.appendChild(style);
 
-    // 创建小动物元素（包含提示信息）
+    // 创建小动物元素
     const animal = document.createElement('div');
     animal.id = 'dynamic-animal';
-    // 显示将要跳转的链接（隐藏域名，只显示用户/仓库部分）
-    const displayUrl = config.githubUrl 
-        ? config.githubUrl.replace('https://github.com/', '')
-        : 'GitHub';
-    animal.innerHTML = `
-        <div class="animal-tooltip">跳转到 ${displayUrl}</div>
-        <img src="${config.animalImage}" alt="动态小动物">
-    `;
+    
+    // 更新提示信息
+    function updateTooltip() {
+        let tooltipContent, tooltipClass = '';
+        
+        if (config.githubUrl) {
+            const displayUrl = config.githubUrl.replace('https://github.com/', '');
+            tooltipContent = `跳转到 GitHub: ${displayUrl}`;
+        } else {
+            tooltipContent = '未找到GitHub链接，按F12在控制台设置';
+            tooltipClass = 'error';
+        }
+        
+        animal.innerHTML = `
+            <div class="animal-tooltip ${tooltipClass}">${tooltipContent}</div>
+            <img src="${config.animalImage}" alt="动态小动物">
+        `;
+    }
+    
+    updateTooltip();
     document.body.appendChild(animal);
 
-    // 状态变量和移动逻辑（保持不变）
+    // 移动和交互逻辑
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
@@ -213,8 +285,11 @@
 
     // 点击跳转GitHub
     animal.addEventListener('click', () => {
-        if (isClick) {
+        if (isClick && config.githubUrl) {
             window.open(config.githubUrl, '_blank');
+        } else if (isClick) {
+            // 未识别到链接时提示用户如何设置
+            alert('未找到GitHub链接，请按F12打开开发者工具，在控制台输入:\nsetGitHubAnimalUrl("https://github.com/你的用户名/你的仓库名")\n来设置跳转链接');
         }
     });
 
@@ -230,4 +305,14 @@
     initPosition();
     autoMove();
     randomChangeDirection();
+    
+    // 控制台友好提示
+    if (!config.githubUrl) {
+        console.log(`%cGitHub小动物组件: 未自动识别到仓库链接`, 'color: #e53e3e; font-weight: bold');
+        console.log(`请使用以下命令手动设置:\nsetGitHubAnimalUrl("https://github.com/你的用户名/你的仓库名")`);
+        console.log(`清除设置可使用: clearGitHubAnimalUrl()`);
+    } else {
+        console.log(`%cGitHub小动物组件: 已识别链接: ${config.githubUrl}`, 'color: #38a169; font-weight: bold');
+        console.log(`如需修改可使用: setGitHubAnimalUrl("新链接")`);
+    }
 })();
